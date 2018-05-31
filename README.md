@@ -6,12 +6,14 @@ To be used in conjunction with SmokePing (https://oss.oetiker.ch/smokeping/index
 # Example Configuration
 
 ## /etc/smokeping/config.d/Probes
+```
   + Surfboard
   step = 10
   offset = 1%
   pings = 3
-
+```
 ##  /etc/smokeping/config.d/Targets
+```
   + SB
   menu = SB
   title = SB
@@ -40,6 +42,7 @@ To be used in conjunction with SmokePing (https://oss.oetiker.ch/smokeping/index
   title = All SB Stats
   host = /SB/SNRDown /SB/PLDown /SB/PLUpstream
   key = PL_Up
+```
 
 # License
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the
