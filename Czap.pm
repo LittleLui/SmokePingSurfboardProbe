@@ -15,7 +15,7 @@ to generate the POD document.
 =cut
 
 use strict;
-use base qw(Smokeping::probes::basefork); 
+use base qw(Smokeping::probes::base); 
 # or, alternatively
 # use base qw(Smokeping::probes::base);
 use Carp;
@@ -64,39 +64,20 @@ sub new($$$)
 sub probevars {
 	my $class = shift;
 	return $class->_makevars($class->SUPER::probevars, {
-		#_mandatory => [ 'binary' ],
-		#binary => { 
-		#	_doc => "The location of your pingpong binary.",
-		#	_example => '/usr/bin/pingpong',
-		#	_sub => sub { 
-		#		my $val = shift;
-        	#		return "ERROR: pingpong 'binary' does not point to an executable"
-            	#			unless -f $val and -x _;
-		#		return undef;
-		#	},
-		#},
-	});
-}
-
-# Here's the place for target-specific variables
-
-sub targetvars {
-	my $class = shift;
-	return $class->_makevars($class->SUPER::targetvars, {
 		#weight => { _doc => "The weight of the pingpong ball in grams",
 		#	       _example => 15
 		#},
 		#
 
-		_mandatory => ['channel', 'key'],
-		channel => {
-			_doc => "Either -n <number> or the channel name in single or double quotes.",
-			_example => "'-n 1' OR '\"History HD(SKY)\"'"
-		},
-		key => {
-			_doc => "The key of the stat to query, either 'signal', 'snr', 'ber' or 'unc'.",
-			_example => 'signal'
-		},
+#		_mandatory => ['key'],
+#		channel => {
+#			_doc => "Either -n <number> or the channel name in single or double quotes.",
+#			_example => "'-n 1' OR '\"History HD(SKY)\"'"
+#		},
+#		key => {
+#			_doc => "The key of the stat to query, either 'signal', 'snr', 'ber' or 'unc'.",
+#			_example => 'signal'
+#		},
 			
 	});
 }
@@ -111,20 +92,18 @@ sub ProbeDesc($){
 # via the $self->{properties} hash and the
 # target-specific variables via $target->{vars}
 
-# If you based your class on 'Smokeping::probes::base',
-# you'd have to provide a "ping" method instead
-# of "pingone"
-
-sub pingone ($){
+sub ping ($){
     my $self = shift;
-    my $target = shift;
+
+    $self->increment_rounds_count;
 
 #    my $host = $target->{addr};
 
-    my $count = $self->pings($target); # the number of pings for this targets
-    my $key = $target->{vars}{key};
-    my $channel = $target->{vars}{channel};
-    my @times;
+    my $count = $self->pings; # the number of pings for this targets
+
+    my @adds = @{$self->addresses};
+    return unless @adds;
+
 
     my %regexes = (
 	    'signal' => 'signal\s*([0-9]+)',
@@ -133,20 +112,28 @@ sub pingone ($){
 	    'unc' => 'unc\s*([0-9]+)'
     );
 
-    my $regex = $regexes{$key}; 
+    $self->{rtts} = {};
+    
+    while (my $address=shift(@adds)) {
+    	my @times;
+	
+	my ($key, $channel) = split /:/, $address, 2;
+    	my $regex = $regexes{$key}; 
+    	$self->do_log("key: $key => regex: $regex - channel: $channel");
 
-    $self->do_debug("key: $key => regex: $regex - channel: $channel");
+    	my $cmd = "/usr/bin/czap -H $channel 2>&1"; 
+    	$self->do_log("command: $cmd");
 
-    my $pid = open2(\*CZAP_OUT, \*CZAP_IN, "/usr/bin/czap -H $channel 2>&1")
-      or die "open2() failed $!";
+    	my $pid = open2(\*CZAP_OUT, \*CZAP_IN, $cmd)
+      	or die "open2($cmd) failed $!";
 
-    $self->do_debug("started $pid");
+    	$self->do_log("started $pid");
 
-    my $i = 0;
-    while ($i < $count && kill(0, $pid)) {
-        if (defined (my $line = <CZAP_OUT>)) {
+    	my $i = 0;
+    	while ($i < $count && kill(0, $pid)) {
+          if (defined (my $line = <CZAP_OUT>)) {
 	    chomp($line);
-  	    $self->do_debug("post-chomp $line");
+  	    $self->do_log("post-chomp $line");
 	    if ($line =~ /FE_HAS_LOCK/) {
 	        $i += 1;
 
@@ -156,15 +143,23 @@ sub pingone ($){
 
 	        push @times, $1;
 	    }
-	}
+	  }
+       }
 
+       $self->do_debug("eof or ate all $i/$count. $!");
+
+       close CZAP_OUT;
+       kill 'SIGINT', $pid;
+
+
+       #WEITER: irgendwie scheiterts da wohl dran, das format von $self->{rtts} is wohl noch nicht ganz das erwartete
+       #$self->{rtts}{$address} = \@times;
+       map { $self->{rtts}{$_} = [@times] } @{$self->{addrlookup}{$address}} ;
+
+       sleep(1);
     }
 
-   $self->do_debug("eof or ate all $i/$count. $!");
-
-    close CZAP_OUT;
-
-    return @times;
+    $self->do_log("dump: " . Dumper($self->{rtts}));
 }
 
 # That's all, folks!
