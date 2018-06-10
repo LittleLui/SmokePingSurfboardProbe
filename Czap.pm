@@ -141,6 +141,8 @@ sub ping ($){
 	        $line =~ /.$regex./;
 	        $self->do_debug("2 line: $line, $1");
 
+		$self->do_debug("$address => $1");
+
 	        push @times, $1;
 	    }
 	  }
@@ -156,7 +158,7 @@ sub ping ($){
        sleep(1);
     }
 
-#    $self->do_debug("dump: " . Dumper($self->{rtts}));
+    #$self->do_debug("dump: " . Dumper($self->{rtts}));
 }
 
 # That's all, folks!
