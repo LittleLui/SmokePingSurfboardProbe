@@ -119,21 +119,21 @@ sub ping ($){
 	
 	my ($key, $channel) = split /:/, $address, 2;
     	my $regex = $regexes{$key}; 
-    	$self->do_log("key: $key => regex: $regex - channel: $channel");
+    	$self->do_debug("key: $key => regex: $regex - channel: $channel");
 
     	my $cmd = "/usr/bin/czap -H $channel 2>&1"; 
-    	$self->do_log("command: $cmd");
+    	$self->do_debug("command: $cmd");
 
     	my $pid = open2(\*CZAP_OUT, \*CZAP_IN, $cmd)
       	or die "open2($cmd) failed $!";
 
-    	$self->do_log("started $pid");
+    	$self->do_debug("started $pid");
 
     	my $i = 0;
     	while ($i < $count && kill(0, $pid)) {
           if (defined (my $line = <CZAP_OUT>)) {
 	    chomp($line);
-  	    $self->do_log("post-chomp $line");
+  	    $self->do_debug("post-chomp $line");
 	    if ($line =~ /FE_HAS_LOCK/) {
 	        $i += 1;
 
@@ -151,15 +151,12 @@ sub ping ($){
        close CZAP_OUT;
        kill 'SIGINT', $pid;
 
-
-       #WEITER: irgendwie scheiterts da wohl dran, das format von $self->{rtts} is wohl noch nicht ganz das erwartete
-       #$self->{rtts}{$address} = \@times;
        map { $self->{rtts}{$_} = [@times] } @{$self->{addrlookup}{$address}} ;
 
        sleep(1);
     }
 
-    $self->do_log("dump: " . Dumper($self->{rtts}));
+#    $self->do_debug("dump: " . Dumper($self->{rtts}));
 }
 
 # That's all, folks!
